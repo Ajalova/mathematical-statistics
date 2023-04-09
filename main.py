@@ -1,166 +1,77 @@
 import numpy as np
 import pandas as pd
-import networkx as nx
+import math
+import seaborn as sns
 from matplotlib import pyplot as plt
-from numpy import linalg as LA
-from scipy.linalg import solve
-import random
+from scipy.stats import norm as normas
+from scipy.stats import chi2
 
-
-#чтение таблицы в массив
-m=4
-k=20
-N=150
-top_players = pd.read_excel('./table2.xlsx')
+top_players = pd.read_excel('./asasa.xlsx')
 top_players.head()
 n=top_players.to_numpy()
-a=np.array(np.delete(n, 0, 1),float)
-print("матрица переходных вероятностей:")
-print('\n'.join('\t'.join(map(str, row)) for row in a))
+a=np.array(n,float)
+a=np.concatenate(a)
+a_max=a.max()
+a_min=a.min()
+cont_of_intervals=int(1+math.log2(100))
+long_og_intervals=(a_max-a_min)/cont_of_intervals
+vibor_sred=np.sum(a)/100
+#disp=np.var(a, ddof = 1)
 
-#печать графа
+s2=0
+for i in range(0,100):
+    s2=s2+(a[i]**2-vibor_sred)
 
-G1 = nx.MultiDiGraph()
-G = nx.Graph()
-for i in range(len(a)):
-    for j in range(len(a)):
-        if (a[i][j]!=0 and a[i][j]!=None):
-            G.add_edge(i+1, j+1, weight=a[i][j])
-            G1.add_edge(i + 1, j + 1, weight=a[i][j])
+s2=s2/101
 
-pos = nx.circular_layout(G1)
-nx.draw_networkx_nodes(G, pos)
-pos1={}
-j=(0,0,{"":0})
-pos1 = {}
-pos2 = {}
-for i in G.edges(None, True):
-    if (i[0] == j[1] and j[0] == i[1]):
-        pos1[i[0]] = pos[i[0]].copy()
-        pos1[i[0]][0] += 0.255
-        pos1[j[0]][0] -= 0.255
-        pos2[i[0]] = (i[2]['weight'])
-    if (i[0] == i[1]):
-        pos1[i[0]] = pos[i[0]].copy()
-        pos1[i[0]][1] += 0.255
-        pos2[i[0]] = (i[2]['weight'])
-    j=i
+b=[0]*8
+for i in range(0,100):
+    e=0
+    while(a[i]-a_min>(e+1)*long_og_intervals):
+        e+=1
+    b[e]+=1
 
+print(b)
 
-nx.draw_networkx_edges(G1, pos, edgelist=None, width=1,connectionstyle='arc3,rad=0.2')
-edge_labels = nx.get_edge_attributes(G, "weight")
-nx.draw_networkx_edge_labels(G, pos, edge_labels,font_size=8)
-
-nx.draw_networkx_labels(G1, pos,font_size=10)
-nx.draw_networkx_labels(G, pos1, {n:lab for n,lab in pos2.items() if n in pos1},font_size=8, font_color='k', font_family='sans-serif', font_weight='normal', alpha=None,  horizontalalignment='center', verticalalignment='bottom', ax=None, clip_on=False)
-ax = plt.gca()
-ax.margins(0.08)
-plt.axis("off")
-plt.tight_layout()
-
-#эргодичность
-
-P_2 = np.linalg.matrix_power(a, 2)
-print("n = 2:\n", P_2)
-P_3 = np.linalg.matrix_power(a, 3)
-print("\nn = 3:\n", P_3)
-P_500 = np.linalg.matrix_power(a, 20)
-print("\nn = 20:\n", P_500)
-P_1000 = np.linalg.matrix_power(a, 500)
-print("\nn = 500:\n", P_1000)
-P_1000 = np.linalg.matrix_power(a, 1000)
-print("\nn = 1000:\n", P_1000)
+#plt.figure(1)
+fig, ax = plt.subplots(figsize=(6, 5))
+sns.histplot(a, stat='density', bins=cont_of_intervals)
+x = np.linspace(-10, 5)
+#plt.figure(2)
+f1 = 1/(math.sqrt(2*math.pi*s2))*(math.exp(1)**(-((x-vibor_sred)**2)/(2*s2)))
+plt.plot(x, f1, ':b', label='1st component')
 
 
-# поиск предельных вероятностей
+print(long_og_intervals)
 
-M=[]
-for i in range(m):
-    M.append([0]*(m))
-    for j in range(m):
-        if(i==j):
-            M[i][j]=-1+a[j][i]
-        else:
-            M[i][j] = a[j][i]
-M.append([1]*(m))
-del M[m-1]
-print("матрица для СЛАУ:")
-print(np.matrix(M))
-pi=solve(M, [0]*(m-1)+[1])
-print("\nвектор предельных вероятностей:")
-print('pi_j=',pi)
+#plt.figure(1)
+granici=[0]*8
+for i in range(0,8):
+    granici[i]=a_min+(i)*long_og_intervals
 
-#моделирование начального вектора вероятностей состояний
 
-r=sorted(np.random.uniform(low = 0.0, high = 1.0, size = m))
-print('r=',r)
-p0=[r[0]]
-for i in range(1,m-1):
-    p0.append(r[i]-r[i-1])
-p0.append(1-r[m-2])
-print("\nначальный вектор вероятностей:")
-print('p_0=',p0)
+#plt.plot(granici, b, 'black')
 
-#безусловные вероятности состояний смоделированной цепи на k шаге
-Pk=LA.matrix_power (a.transpose(), k)
-pk=np.matmul(Pk, p0)
-print("\nбезусловные вероятности состояний смоделированной цепи на k шаге:")
-print('p(',k,')=',pk)
+n=len(a)
+granici.append(1000)
+b.insert(0,0)
+granici.insert(0,-1000)
+b0=[granici[i] for i in range(len(granici)-1)]
+b1=[granici[i+1] for i in range(len(granici)-1)]
+teor_thast=[n*(normas.cdf((b1[i]-vibor_sred)/math.sqrt(s2))-normas.cdf((b0[i]-vibor_sred)/math.sqrt(s2))) for i in range(1,8)]
+teor_thast.insert(0,n*normas.cdf(((b1[0]-vibor_sred)/math.sqrt(s2))))
+teor_thast.append(n*(1-normas.cdf(((b0[8]-vibor_sred)/math.sqrt(s2)))))
 
-#моделированиe траекторий
-ss=[]
-for i in range(N):
-    s=[0]*k
-    otr=np.cumsum(p0.copy())
-    otr1=p0.copy()
-    for j in range(k):
-        r0 = random.uniform(0, otr[m-1])
-        num=0
-        if (r0 < otr[0]):
-            num=0
-        else:
-            for i in range(1,m):
-                if (otr[i-1]<r0<otr[i]):
-                    num=i
-        if(len(np.where(otr1==0.5)[0])==2):
-            s[j]=1+random.choice(np.where(otr1==0.5)[0])
-        else:
-            s[j]=1+num
-        otr = np.cumsum(a[s[j]-1])
-        otr1=a[s[j]-1]
+df = pd.DataFrame({'интервал': b0,'': b1,
+                   'Имперические частоты': b,
+                   'Теоретические частоты': teor_thast})
+print(df)
 
-    print("S=",s)
-    ss.append(s)
-emp=[]
-for i in range(k):
-    emp.append([0]*m)
-    for j in range(m):
-        for l in range(N):
-            if(ss[l][i]==j+1):
-                emp[i][j]+=1/N
-
-print('\n\n')
-print('Эмперические вероятности')
-print(np.matrix(emp))
-
-fig = plt.figure(figsize=(6, 4))
-ax = fig.add_subplot()
-x = np.arange(m)
-y3 = pi
-y2 = emp[k-1]
-y1 = pk
-w = 0.3
-
-fig.set_facecolor('floralwhite')
-ax.bar(x +w, y1, width=w, label = "Теоретические вероятности")
-ax.bar(x , y2, width=w, label = "Эмпирические вероятности")
-ax.bar(x - w, y3, width=w, label = "Предельные вероятности")
-ax.legend()
-plt.show()
+ksi_kvadrat_vibor=sum([(b[i]-teor_thast[i])**(2)/teor_thast[i] for i in range(len(teor_thast))])
+m=(cont_of_intervals-1)-2-1
+print("chi^2_в=",ksi_kvadrat_vibor)
+print("сhi^2(m)=",chi2.ppf(0.98,m))
 
 plt.show()
-
-
-
 
 
